@@ -23,6 +23,7 @@ class HomeController extends GetxController {
   int _page = 1;
   int _totalPages = 1;
   bool _isFetchingMore = false;
+  int _refreshGeneration = 0;
 
   bool get hasMore => _page < _totalPages;
 
@@ -56,6 +57,7 @@ class HomeController extends GetxController {
   }
 
   Future<void> refreshDeals() async {
+    _refreshGeneration++;
     _page = 1;
     final res = await dealRepo.fetchDeals(page: 1);
     _totalPages = res.totalPages;
@@ -71,16 +73,21 @@ class HomeController extends GetxController {
     }
     _isFetchingMore = true;
     _page++;
+    final gen = _refreshGeneration;
     try {
       final res = await dealRepo.fetchDeals(page: _page);
+      // refresh happened while waiting so discard data
+      if (gen != _refreshGeneration) return;
       _totalPages = res.totalPages;
       deals.addAll(res.items);
     } catch (e) {
+      if (gen != _refreshGeneration) return;
       LogService.error('loadMore failed', e);
       _page--;
+    } finally {
+      _isFetchingMore = false;
+      refreshController.loadComplete();
     }
-    _isFetchingMore = false;
-    refreshController.loadComplete();
   }
 
   void scrollToTop() {

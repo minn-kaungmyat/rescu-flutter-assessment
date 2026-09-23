@@ -1,28 +1,30 @@
 # solutions.md
 
-## RES-101 — Search shows results for the wrong query
+## RES-101 Search shows results for the wrong query
 
-**Root cause:** `_search()` fired on every keystroke with no delay and no way to cancel old requests. The API is intentionally slower for short broad queries like "s" (~1.2s) than specific ones like "sushi" (~0.2s). So typing "sushi" sends 5 requests — "sushi" returns first and shows correct results, then "s" returns last and overwrites them.
+**Root cause:** `_search()` fired on every keystroke with no delay and no way to cancel old requests. The API is intentionally slower for short broad queries like "s" (~1.2s) than specific ones like "sushi" (~0.2s). So typing "sushi" sends 5 requests "sushi" returns first and shows correct results, then "s" returns last and overwrites them.
 
 **Why this fix is the right one:** Added a 300ms debounce time so only the final query is sent after the use pauses for a moment. Also added a generation counter so each search gets a ticket number, and when results come back we check if the number is still current. If a newer search starts, the stale results will be thrown away.
 
 - _Alternative considered and rejected:_ My first thought after seeing the bug was using the debounce timer only. But when I discussed with the AI, I found that we really need both debounce and generation counter because if a user types and pauses (triggering a slow search), and then types again (triggering a fast search), the slow search could still arrive late and overwrite the correct results.
 
-## **Edge cases:** Clearing the text field resets immediately (no debounce). The debounce timer is cancelled in `onClose()` so it can't fire after the search screen is closed.
+**Edge cases:** Clearing the text field resets immediately (no debounce). The debounce timer is cancelled in `onClose()` so it can't fire after the search screen is closed.
 
-## RES-102 — Crash after leaving My Orders
+---
 
-**Root cause:** In `pickup_countdown.dart`, a `Timer.periodic` is created in `initState()` to update the countdown every second. But the timer was never stored in a variable and there was no `dispose()` method. When the user navigates away, Flutter destroys the widget, but the orphaned timer keeps firing `setState()` on the dead widget — causing the `setState() called after dispose()` crash.
+## RES-102 Crash after leaving My Orders
 
-**Why this fix is the right one:** Store the timer in a `_timer` variable and cancel it in `dispose()`. This is the standard Flutter pattern for cleaning up resources tied to a widget's lifecycle — the timer only lives as long as the widget does.
+**Root cause:** In `pickup_countdown.dart`, a `Timer.periodic` is created in `initState()` to update the countdown every second. But the timer was never stored in a variable and there was no `dispose()` method. When the user navigates away, Flutter destroys the widget, but the orphaned timer keeps firing `setState()` on the dead widget causing the `setState() called after dispose()` crash.
 
-- _Alternative considered and rejected:_ Wrapping `setState` in an `if (mounted)` check. This would stop the crash, but the timer would still run forever in the background wasting resources. The assessment says "a fix that merely hides the symptom scores worse than a correct diagnosis" — so properly cancelling the timer is the right approach.
+**Why this fix is the right one:** Store the timer in a `_timer` variable and cancel it in `dispose()`. This is the standard Flutter pattern for cleaning up resources tied to a widget's lifecycle the timer only lives as long as the widget does.
+
+- _Alternative considered and rejected:_ Wrapping `setState` in an `if (mounted)` check. This would stop the crash, but the timer would still run forever in the background wasting resources. The assessment says "a fix that merely hides the symptom scores worse than a correct diagnosis" so properly cancelling the timer is the right approach.
 
 **Edge cases:** If the pickup window is already open when the widget loads (the remaining time is negative), the timer still ticks harmlessly showing "Pickup window is open", and gets properly cancelled when leaving. No additional logic needed.
 
 ---
 
-## RES-103 — Requests pile up the longer you browse
+## RES-103 Requests pile up the longer you browse
 
 **Root cause:** In `deal_details_controller.dart`, this `ever(cartService.itemCount, ...)` use a listener to the global `CartService` every time we open a deal page. Because the global `CartService` lives forever but the controller is destroyed when we leave. The listener is glued to the permanent service, so it nevers get's cleaned up. Eg. after visiting 5 deals, there are 5 listeners and then tapping "Add to bag" results 5 separate API calls to re-check availability for all those deals.
 
@@ -34,16 +36,28 @@
 
 ---
 
+## RES-104 Duplicate deals in the home feed
+
+**Root cause:** In `home_controller.dart`, there are `refreshDeals()` and `loadMore()` share the same `_page` variable without coordination. If the user pulls to refresh while the `loadMore()` is waiting for the server response, the refresh resets `_page` to 1. But `loadMore()` still finishes and appends its old page 2 data to list. The next scroll triggers `loadMore()` to fetch page 2 again (because `_page` is 1 now) results in duplicates.
+
+**Why this fix is the right one:** We used a ticket like `_refreshGeneration` counter just like in RES-101. `refreshDeals()` increments the counter. `loadMore()` checks this counter before and after fetching data. If the counter changed while waiting, it means a refresh happened so the old data is rejected.
+
+- _Alternative considered and rejected:_ Blocking pull-to-refresh while `loadMore()` is running. This would prevent the race condition but it is bad UX. Also if the network is slow, the user's natural reaction is to pull down to refresh, and blocking that makes the app feel broken.
+
+**Edge cases:** If the user triggers multiple rapid refreshes, each one increments the generation, so only the very last refresh's data survives. The `finally` block ensures `_isFetchingMore` is always cleaned up even when we discard stale data.
+
+---
+
 ## AI Usage Log
 
 **Tool used:** Antigravity IDE (Claude) for codebase analysis and understanding, root-cause identification, code fixes, and documentation.
 
 **How I used it:** I had the AI analyze the entire codebase first to map out the architecture roughly, skim through the code and identify root causes for all bugs before writing any code. For each fix, I reviewed every line the AI generated and tested it myself. I commented out parts of the fix (eg. generation counter for search) to verify it was actually necessary by reproducing the bug without it.
 
-**Example 1 — wrong/misleading AI suggestion:**
+**Example 1 wrong/misleading AI suggestion:**
 _(To be filled with a real example as we `work through more bugs)_
 
-**Example 2 — wrong/misleading AI suggestion:**
+**Example 2 wrong/misleading AI suggestion:**
 _(To be filled with a real example as we work through more bugs)_
 
 ---
