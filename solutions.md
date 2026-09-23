@@ -8,8 +8,7 @@
 
 - _Alternative considered and rejected:_ My first thought after seeing the bug was using the debounce timer only. But when I discussed with the AI, I found that we really need both debounce and generation counter because if a user types and pauses (triggering a slow search), and then types again (triggering a fast search), the slow search could still arrive late and overwrite the correct results.
 
-**Edge cases:** Clearing the text field resets immediately (no debounce). The debounce timer is cancelled in `onClose()` so it can't fire after the search screen is closed.
----
+## **Edge cases:** Clearing the text field resets immediately (no debounce). The debounce timer is cancelled in `onClose()` so it can't fire after the search screen is closed.
 
 ## RES-102 — Crash after leaving My Orders
 
@@ -20,6 +19,18 @@
 - _Alternative considered and rejected:_ Wrapping `setState` in an `if (mounted)` check. This would stop the crash, but the timer would still run forever in the background wasting resources. The assessment says "a fix that merely hides the symptom scores worse than a correct diagnosis" — so properly cancelling the timer is the right approach.
 
 **Edge cases:** If the pickup window is already open when the widget loads (the remaining time is negative), the timer still ticks harmlessly showing "Pickup window is open", and gets properly cancelled when leaving. No additional logic needed.
+
+---
+
+## RES-103 — Requests pile up the longer you browse
+
+**Root cause:** In `deal_details_controller.dart`, this `ever(cartService.itemCount, ...)` use a listener to the global `CartService` every time we open a deal page. Because the global `CartService` lives forever but the controller is destroyed when we leave. The listener is glued to the permanent service, so it nevers get's cleaned up. Eg. after visiting 5 deals, there are 5 listeners and then tapping "Add to bag" results 5 separate API calls to re-check availability for all those deals.
+
+**Why this fix is the right one:** Save the `Worker` object returned by `ever()` and call `_cartListener.dispose()` in the controller's `onClose()`. This way the listener dies when the controller dies, and only the current deal page reacts to cart changes.
+
+- _Alternative considered and rejected:_ Removing the `ever()` entirely and just re-checking availability inside `addToCart()` after adding. This might work but breaks the reactive pattern like if someone else modifies the cart (e.g. from a different screen), this deal page wouldn't know about it.
+
+**Edge cases:** If the user leaves the deal page before the re-check API call finishes, the response comes back to a disposed controller. But GetX handles this well, the observable update is ignored since nothing is listening anymore.
 
 ---
 
