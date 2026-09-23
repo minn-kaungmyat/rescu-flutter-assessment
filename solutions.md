@@ -48,6 +48,60 @@
 
 ---
 
+## RES-105 Home feed jank
+
+**Root cause:** There were three contributing problems in the home feed:
+
+1. **Unnecessary rebuilds:** `scrollOffset` was observed by an `Obx` wrapping the entire `Scaffold`. The scroll listener updates `scrollOffset` continuously, so the whole screen subtree was rebuilt during scrolling even though only the AppBar elevation and FAB visibility needed the value.
+
+2. **Eager list construction:** The feed used `ListView(children: ...)` and created all `DealCard` widgets from `visibleDeals` at once. As more deals were loaded, more widgets were created instead of building them only when needed.
+
+3. **Large images in memory:** `TheNetworkImage` used `CachedNetworkImage` without `memCacheHeight` or `memCacheWidth`. The deal images are displayed at a fixed size, but the source images can be much larger, so the in-memory image cache could use more memory than necessary.
+
+**Why this fix is the right one:**
+
+1. **Targeted `Obx`:** Removed the top-level `Obx` and moved the `scrollOffset` observers to the AppBar and FAB. This prevents scroll updates from rebuilding the feed.
+
+2. **Lazy list:** Replaced `ListView(children: ...)` with `ListView.builder`. Deal cards are now built lazily as they are needed.
+
+3. **Image cache size:** Added `memCacheHeight` based on the displayed image height and device pixel ratio. This reduces the size of decoded images kept in the memory cache when the source image is much larger than the displayed image.
+
+**DevTools Evidence:**
+
+_Note: The screenshots for the evidence below are located in the `assets/` folder._
+
+**Before the fixes:**
+
+- **UI jank:** The UI thread reached 118.0 ms for a frame, well above the ~16 ms target for 60 FPS. `DealCard` was rebuilt over 1,500 times during the test.
+
+- **Memory:** The Dart heap reached 114.2 MB. The memory profiler showed 305 `DealCard` instances during the test.
+
+![Before Performance 1](assets/before_perf_1.png)
+
+![Before Performance 2](assets/before_perf_2.png)
+
+![Before Memory](assets/before_memory.png)
+
+**After the fixes:**
+
+- **UI performance:** UI thread time dropped from 118.0 ms to 4.8 ms during the comparable scrolling test, and the repeated feed rebuilds were no longer observed.
+
+- **Raster performance:** Raster time was around 3.0 ms during steady scrolling.
+
+- **Memory:** Dart heap usage dropped from 114.2 MB to 84.9 MB during the comparable test. The number of active `DealCard` instances was also substantially lower because the list is now built lazily.
+
+![After Performance 1](assets/after_perf_1.png)
+
+![After Performance 2](assets/after_perf_2.png)
+
+![After Memory](assets/after_memory.png)
+
+- _*Alternative considered and rejected:*_ I considered using `CustomScrollView` with `SliverList`, but `ListView.builder` provides the required lazy construction with less structural change to the existing screen.
+
+**Edge cases:** Pull-to-refresh continues to work as before. The AppBar remains correctly sized after moving its `Obx` into the `PreferredSize` wrapper.
+
+---
+
 ## AI Usage Log
 
 **Tool used:** Antigravity IDE (Claude) for codebase analysis and understanding, root-cause identification, code fixes, and documentation.
