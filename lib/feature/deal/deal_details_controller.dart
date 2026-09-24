@@ -17,7 +17,9 @@ class DealDetailsController extends GetxController {
     required this.analytics,
   });
 
-  late final DealModel deal;
+  final _deal = Rxn<DealModel>();
+  DealModel? get deal => _deal.value;
+  bool get isLoading => _deal.value == null;
 
   final _quantityLeft = RxnInt();
   Worker? _cartListener;
@@ -26,10 +28,35 @@ class DealDetailsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    deal = Get.arguments as DealModel;
-    _quantityLeft.value = deal.quantityLeft;
+    _initDeal();
+  }
+
+  Future<void> _initDeal() async {
+    if (Get.arguments is DealModel) {
+      _deal.value = Get.arguments as DealModel;
+      _onDealLoaded();
+      return;
+    }
+
+    final idParam = Get.parameters['id'];
+    if (idParam != null) {
+      final id = int.tryParse(idParam);
+      if (id != null) {
+        try {
+          _deal.value = await dealRepo.fetchById(id);
+          _onDealLoaded();
+          return;
+        } catch (e) {
+          LogService.error('Failed to fetch deal from deep link', e);
+        }
+      }
+    }
+  }
+
+  void _onDealLoaded() {
+    _quantityLeft.value = _deal.value!.quantityLeft;
     analytics.logEvent('deal_details_view', {
-      'deal_id': deal.id,
+      'deal_id': _deal.value!.id,
       'source': Get.parameters['source'] ?? 'unknown',
     });
     // Whenever the cart changes, re-check this deal's remaining stock so the
@@ -38,16 +65,18 @@ class DealDetailsController extends GetxController {
   }
 
   Future<void> _recheckAvailability() async {
-    LogService.log('re-checking availability for deal ${deal.id}');
-    final fresh = await dealRepo.fetchById(deal.id);
+    if (deal == null) return;
+    LogService.log('re-checking availability for deal ${deal!.id}');
+    final fresh = await dealRepo.fetchById(deal!.id);
     _quantityLeft.value = fresh.quantityLeft;
   }
 
   void addToCart() {
-    cartService.add(deal);
+    if (deal == null) return;
+    cartService.add(deal!);
     Get.snackbar(
       'Added to bag',
-      '${deal.name} — pick up ${deal.pickupWindow.label}',
+      '${deal!.name} — pick up ${deal!.pickupWindow.label}',
       snackPosition: SnackPosition.BOTTOM,
       duration: const Duration(seconds: 2),
     );

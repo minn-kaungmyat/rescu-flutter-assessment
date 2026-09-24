@@ -114,6 +114,18 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 
 ---
 
+## RES-107 Deep link opens to a crash
+
+**Root cause:** When opened through a deep link, GetX does not pass the `DealModel` object in memory, meaning `Get.arguments` is `null`. The controller blindly tried to read `deal = Get.arguments as DealModel;`, causing an instant crash.
+
+**Why this fix is the right one:** I updated the controller to handle missing data. If `Get.arguments` is missing, it grabs the `id` from the URL and downloads the deal from the backend. While it downloads, the screen displays a `CircularProgressIndicator` to prevent UI crashes. Once the data arrives, the screen instantly rebuilds.
+
+- _Alternative considered and rejected:_ We could just simply show an error screen saying "Please open this deal from the home feed.", but this was rejected because the requirements explicitly forbid using error/fallback screens.
+
+**Edge cases:** I added `if (deal == null) return;` safeguards inside `addToCart()` and `_recheckAvailability()`. This prevents the app from crashing if those actions are somehow triggered before the deep link finishes loading.
+
+---
+
 ## AI Usage Log
 
 **Tool used:** Antigravity IDE (Claude) for codebase analysis and understanding, root-cause identification, code fixes, and documentation.
