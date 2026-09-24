@@ -126,6 +126,16 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 
 ---
 
+## F-1 Live flash-sale countdowns
+
+**Implementation:** I added `TickService` that acts as a single 1-second metronome for the entire app. I created a tiny `FlashCountdownText` widget that uses `Obx` to redraw only the `00:00` string every second. For the Deal Card, I built a `FlashSaleWrapper` that listens to the clock in the background using `ever()`, but only calls `setState()` exactly once when the expiration time is reached. Also added a background listener to `CartService` that checks the clock every second; when `00:00` hits, it automatically deletes expired deals from the cart, blocks new additions, and pops up a `Snackbar` notice.
+
+- _Alternative considered and rejected:_ The easiest approach would be wrapping the entire `DealCard` in an `Obx` so the whole card rebuilds every second. Rejected this because rebuilding a heavy parent card 60 times a minute per item can destroy scroll performance.
+
+**Edge cases:** I handled the edge case where a user is actively staring at the `DealDetailsScreen` at the exact second a deal expires. To prevent them from trying to add a dead deal to their cart, the "Add to bag" button is wrapped in its own `Obx` and instantly passes `onPressed: null` to turn itself grey and unclickable the millisecond the clock runs out.
+
+---
+
 ## AI Usage Log
 
 **Tool used:** Antigravity IDE (Claude) for codebase analysis and understanding, root-cause identification, code fixes, and documentation.
@@ -133,7 +143,7 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 **How I used it:** I had the AI analyze the entire codebase first to map out the architecture roughly, skim through the code and identify root causes for all bugs before writing any code. For each fix, I reviewed every line the AI generated and tested it myself. I commented out parts of the fix (eg. generation counter for search) to verify it was actually necessary by reproducing the bug without it.
 
 **Example 1 wrong/misleading AI suggestion:**
-_(To be filled with a real example as we `work through more bugs)_
+_(To be filled with a real example as we work through more bugs)_
 
 **Example 2 wrong/misleading AI suggestion:**
 _(To be filled with a real example as we work through more bugs)_

@@ -60,7 +60,7 @@ class DealModel {
           json['pickupWindow'] as Map<String, dynamic>? ?? {}),
       flashSaleEndsAt: json['flashSaleEndsAt'] == null
           ? null
-          : DateTime.parse(json['flashSaleEndsAt'] as String),
+          : DateTime.parse(json['flashSaleEndsAt'] as String).toLocal(),
     );
   }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../app_config.dart';
+import '../../service/tick_service.dart';
+import '../shared_widget/flash_countdown_text.dart';
 import '../shared_widget/the_network_image.dart';
 import 'deal_details_controller.dart';
 
@@ -106,6 +108,38 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
                         ],
                       ),
                     ),
+                    if (deal.isFlashSale) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade100),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bolt, color: Colors.red.shade600),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Flash sale ends in',
+                                    style: TextStyle(
+                                        fontSize: 13, color: Colors.grey)),
+                                FlashCountdownText(
+                                  endsAt: deal.flashSaleEndsAt!,
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.red.shade700),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     const Text('What you get',
                         style: TextStyle(
@@ -140,11 +174,16 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
           color: Colors.white,
           child: SizedBox(
             width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: controller.addToCart,
-              icon: const Icon(Icons.add_shopping_cart),
-              label: const Text('Add to bag'),
-            ),
+            child: Obx(() {
+              final isExpired = deal.isFlashSale &&
+                  !deal.flashSaleEndsAt!
+                      .isAfter(Get.find<TickService>().now.value);
+              return FilledButton.icon(
+                onPressed: isExpired ? null : controller.addToCart,
+                icon: const Icon(Icons.add_shopping_cart),
+                label: const Text('Add to bag'),
+              );
+            }),
           ),
         ),
       );
