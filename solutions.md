@@ -102,6 +102,18 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 
 ---
 
+## RES-106 Wrong pickup times; "Pickup today" filter misses deals
+
+**Root cause:** The API sends pickup times as ISO-8601 strings in UTC format. `DateTime.parse()` reads this and creates a Dart `DateTime` object locked in the UTC timezone. Because it was never converted to local time, `DateFormat` blindly printed the raw UTC hours and also `isToday` check compared a UTC date against the user's local date. This causes deals filter display to mess up.
+
+**Why this fix is the right one:** I added `.toLocal()` directly in the JSON parser (`PickupWindowModel.fromJson`). This instantly translates the UTC time into the user's local timezone exactly when the data enters the app. This is the cleanest fix because all downstream UI logic (like formatting and the filter check) now automatically operates on local time.
+
+- _Alternative considered and rejected:_ We could kept the model in UTC and added `.toLocal()` only in the UI when formatting the string. I rejected this because it is error-prone: if another developer adds a new screen and forgets to add `.toLocal()`, the bug comes back.
+
+**Edge cases:** I also hardened the `isToday` getter. Instead of just checking if `start.day == DateTime.now().day`, it now also checks the `year`, `month`, and `day`.
+
+---
+
 ## AI Usage Log
 
 **Tool used:** Antigravity IDE (Claude) for codebase analysis and understanding, root-cause identification, code fixes, and documentation.
