@@ -15,10 +15,50 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
     return Obx(() {
       final deal = controller.deal;
       
-      if (deal == null) {
+      if (controller.isLoading) {
         return const Scaffold(
           body: Center(
             child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      if (deal == null) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Deal Details')),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(
+                    controller.errorMessage ?? 'Deal not found',
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => Get.back(),
+                        child: const Text('Go back'),
+                      ),
+                      if (controller.errorMessage != 'Invalid deal link') ...[
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: controller.retryLoad,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       }

@@ -19,7 +19,12 @@ class DealDetailsController extends GetxController {
 
   final _deal = Rxn<DealModel>();
   DealModel? get deal => _deal.value;
-  bool get isLoading => _deal.value == null;
+  
+  final _isLoading = true.obs;
+  bool get isLoading => _isLoading.value;
+  
+  final _errorMessage = RxnString();
+  String? get errorMessage => _errorMessage.value;
 
   final _quantityLeft = RxnInt();
   Worker? _cartListener;
@@ -32,6 +37,9 @@ class DealDetailsController extends GetxController {
   }
 
   Future<void> _initDeal() async {
+    _isLoading.value = true;
+    _errorMessage.value = null;
+
     if (Get.arguments is DealModel) {
       _deal.value = Get.arguments as DealModel;
       _onDealLoaded();
@@ -39,21 +47,36 @@ class DealDetailsController extends GetxController {
     }
 
     final idParam = Get.parameters['id'];
-    if (idParam != null) {
-      final id = int.tryParse(idParam);
-      if (id != null) {
-        try {
-          _deal.value = await dealRepo.fetchById(id);
-          _onDealLoaded();
-          return;
-        } catch (e) {
-          LogService.error('Failed to fetch deal from deep link', e);
-        }
-      }
+    if (idParam == null) {
+      _errorMessage.value = 'Invalid deal link';
+      _isLoading.value = false;
+      return;
+    }
+
+    final id = int.tryParse(idParam);
+    if (id == null) {
+      _errorMessage.value = 'Invalid deal link';
+      _isLoading.value = false;
+      return;
+    }
+
+    try {
+      _deal.value = await dealRepo.fetchById(id);
+      _onDealLoaded();
+    } catch (e) {
+      LogService.error('Failed to fetch deal from deep link', e);
+      _errorMessage.value = 'Failed to load deal details';
+    } finally {
+      _isLoading.value = false;
     }
   }
 
+  void retryLoad() {
+    _initDeal();
+  }
+
   void _onDealLoaded() {
+    _isLoading.value = false;
     _quantityLeft.value = _deal.value!.quantityLeft;
     analytics.logEvent('deal_details_view', {
       'deal_id': _deal.value!.id,
