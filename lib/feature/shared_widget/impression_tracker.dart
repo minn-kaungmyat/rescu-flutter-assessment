@@ -46,8 +46,9 @@ class _ImpressionTrackerState extends State<ImpressionTracker> {
             widget.position,
           );
           _hasLogged = true;
-          // Note: we do not call setState because there's no visual change to the UI,
-          // we just want to stop checking visibility to save CPU.
+          // Trigger a rebuild so the VisibilityDetector is detached immediately,
+          // saving CPU cycles on future scroll events.
+          if (mounted) setState(() {});
         });
       }
     } else {

@@ -84,6 +84,7 @@ class AnalyticsService extends GetxService {
   @override
   void onClose() {
     _flushTimer?.cancel();
+    _flush(); // Flush any remaining events in the queue before service dies
     super.onClose();
   }
 }

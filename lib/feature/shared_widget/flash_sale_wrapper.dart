@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
-import '../../service/tick_service.dart';
+import '../../util/central_ticker.dart';
 
 /// Wraps a widget (like a DealCard) and provides an `isExpired` boolean that
 /// only flips exactly once when the flash sale ends.
@@ -24,35 +23,26 @@ class FlashSaleWrapper extends StatefulWidget {
 
 class _FlashSaleWrapperState extends State<FlashSaleWrapper> {
   bool _isExpired = false;
-  Worker? _worker;
 
   @override
   void initState() {
     super.initState();
-
-    final tick = Get.find<TickService>();
-
-    _checkExpired(tick.now.value);
-
-    _worker = ever(tick.now, (now) {
-      _checkExpired(now);
-    });
+    _checkExpired();
+    CentralTicker.instance.addListener(_checkExpired);
   }
 
-  void _checkExpired(DateTime now) {
+  void _checkExpired() {
+    final now = CentralTicker.instance.nowNotifier.value;
     if (!_isExpired && !widget.endsAt.isAfter(now)) {
       _isExpired = true;
-
-      _worker?.dispose();
-      _worker = null;
-
+      CentralTicker.instance.removeListener(_checkExpired);
       setState(() {});
     }
   }
 
   @override
   void dispose() {
-    _worker?.dispose();
+    CentralTicker.instance.removeListener(_checkExpired);
     super.dispose();
   }
 

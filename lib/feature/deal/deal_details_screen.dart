@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../app_config.dart';
-import '../../service/tick_service.dart';
+import '../../util/central_ticker.dart';
 import '../shared_widget/flash_countdown_text.dart';
 import '../shared_widget/the_network_image.dart';
 import 'deal_details_controller.dart';
@@ -215,15 +215,18 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
           child: SizedBox(
             width: double.infinity,
             child: deal.isFlashSale
-                ? Obx(() {
-                    final isExpired = !deal.flashSaleEndsAt!
-                        .isAfter(Get.find<TickService>().now.value);
-                    return FilledButton.icon(
-                      onPressed: isExpired ? null : controller.addToCart,
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text('Add to bag'),
-                    );
-                  })
+                ? ValueListenableBuilder<DateTime>(
+                    valueListenable: CentralTicker.instance.nowNotifier,
+                    builder: (context, now, child) {
+                      final isExpired =
+                          !deal.flashSaleEndsAt!.isAfter(now);
+                      return FilledButton.icon(
+                        onPressed: isExpired ? null : controller.addToCart,
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: const Text('Add to bag'),
+                      );
+                    },
+                  )
                 : FilledButton.icon(
                     onPressed: controller.addToCart,
                     icon: const Icon(Icons.add_shopping_cart),

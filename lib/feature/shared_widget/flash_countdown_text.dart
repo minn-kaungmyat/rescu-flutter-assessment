@@ -1,7 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
-import '../../service/tick_service.dart';
+import '../../util/central_ticker.dart';
 
 /// Displays a live countdown for a flash sale.
 ///
@@ -21,30 +21,35 @@ class FlashCountdownText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tick = Get.find<TickService>();
-    return Obx(() {
-      final remaining = endsAt.difference(tick.now.value);
-      if (remaining <= Duration.zero) {
-        return Text(
-          'Expired',
-          style: expiredStyle ??
-              TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade500,
-              ),
-        );
-      }
-      return Text(
-        _format(remaining),
-        style: style ??
-            TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.red.shade700,
-            ),
-      );
-    });
+    return RepaintBoundary(
+      child: ValueListenableBuilder<DateTime>(
+        valueListenable: CentralTicker.instance.nowNotifier,
+        builder: (context, now, child) {
+          final remaining = endsAt.difference(now);
+          if (remaining <= Duration.zero) {
+            return Text(
+              'Expired',
+              style: expiredStyle ??
+                  TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade500,
+                  ),
+            );
+          }
+          return Text(
+            _format(remaining),
+            style: (style ??
+                    TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red.shade700,
+                    ))
+                .copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          );
+        },
+      ),
+    );
   }
 
   /// Formats a Duration as `mm:ss` or `hh:mm:ss` if above one hour.
