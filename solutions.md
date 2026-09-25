@@ -72,7 +72,7 @@
 
 **DevTools Evidence:**
 
-_Note: The screenshots for the evidence below are located in the `assets/` folder. The performance screenshots are captured while scrolling through the deals rapidly up and down._
+_Note: The screenshots for the evidence below are located in the `assets/` folder._
 
 **Before the fixes:**
 
