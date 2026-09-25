@@ -6,6 +6,7 @@ import '../../../model/deal_model.dart';
 import '../../../routes/routes.dart';
 import '../../shared_widget/flash_countdown_text.dart';
 import '../../shared_widget/flash_sale_wrapper.dart';
+import '../../shared_widget/impression_tracker.dart';
 import '../../shared_widget/the_network_image.dart';
 
 /// Horizontal flash-sale rail.
@@ -43,13 +44,17 @@ class FlashDealsSection extends StatelessWidget {
               final deal = deals[index];
               return SizedBox(
                 width: 200,
-                child: Card(
-                  color: Colors.white,
-                  elevation: 0.5,
-                  clipBehavior: Clip.antiAlias,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  child: FlashSaleWrapper(
-                    endsAt: deal.flashSaleEndsAt!,
+                child: ImpressionTracker(
+                  dealId: deal.id,
+                  source: 'flash_rail',
+                  position: index,
+                  child: Card(
+                    color: Colors.white,
+                    elevation: 0.5,
+                    clipBehavior: Clip.antiAlias,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    child: FlashSaleWrapper(
+                      endsAt: deal.flashSaleEndsAt!,
                     builder: (context, isExpired) => Opacity(
                       opacity: isExpired ? 0.6 : 1.0,
                       child: InkWell(
@@ -112,6 +117,7 @@ class FlashDealsSection extends StatelessWidget {
                             ),
                           ],
                         ),
+                      ),
                       ),
                     ),
                   ),

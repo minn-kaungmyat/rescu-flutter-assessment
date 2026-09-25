@@ -10,9 +10,14 @@ import 'service/analytics_service.dart';
 import 'service/cart_service.dart';
 import 'service/fake_api_service.dart';
 import 'service/tick_service.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Throttle visibility checks to prevent scroll jank on heavy lists
+  VisibilityDetectorController.instance.updateInterval = const Duration(milliseconds: 150);
+  
   await initDependencies();
   runApp(const RescuApp());
 }

@@ -68,7 +68,7 @@
 
 **DevTools Evidence:**
 
-_Note: The screenshots for the evidence below are located in the `assets/` folder._
+_Note: The screenshots for the evidence below are located in the `assets/` folder. The performance screenshots are captured while scrolling through the deals rapidly up and down._
 
 **Before the fixes:**
 
@@ -133,6 +133,16 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 - _Alternative considered and rejected:_ The easiest approach would be wrapping the entire `DealCard` in an `Obx` so the whole card rebuilds every second. Rejected this because rebuilding a heavy parent card 60 times a minute per item can destroy scroll performance.
 
 **Edge cases:** I handled the edge case where a user is actively staring at the `DealDetailsScreen` at the exact second a deal expires. To prevent them from trying to add a dead deal to their cart, the "Add to bag" button is wrapped in its own `Obx` and instantly passes `onPressed: null` to turn itself grey and unclickable the millisecond the clock runs out.
+
+---
+
+## F-2 Impression tracking
+
+**Implementation:** Built an `ImpressionTracker` widget wrapping `VisibilityDetector`. It starts a 1s timer when `visibleFraction >= 0.5`. When completes, it calls `AnalyticsService` to queue the event. `AnalyticsService` uses a `Set<int>` to make sure deals are logged at most once per session. A list queue and a 15-second `Timer` are used to batch events. To maximize scroll performance, `ImpressionTracker.build` first checks the `AnalyticsService` to see if a deal was already logged globally; if so, it entirely skips mounting the `VisibilityDetector`.
+
+- _Alternative considered and rejected:_ We could have placed the `VisibilityDetector` directly inside the `DealCard` file itself. I rejected this because it would tightly couple analytics logic to the UI presentation. Creating a reusable wrapper keeps the UI file clean and allows us to track impressions for any widget in the future.
+
+**Edge cases:** If the user scrolls past a card very quickly, the `visibleFraction` drops below 0.5 before the 1-second timer finishes. The tracker intercepts this and cancels the timer instantly, preventing a false impression from being logged. Additionally, the `ValueKey` used for the detector is a combination of the deal ID, source string, and list index position; this make sure cryptographic uniqueness and prevents the detector from crashing even if a screen renders accidental duplicate deals.
 
 ---
 

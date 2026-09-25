@@ -5,6 +5,7 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../../app_config.dart';
 import '../../routes/routes.dart';
 import '../shared_widget/deal_card.dart';
+import '../shared_widget/impression_tracker.dart';
 import '../shared_widget/shimmer_deal_card.dart';
 import 'home_controller.dart';
 import 'widget/flash_deals_section.dart';
@@ -113,7 +114,12 @@ class HomeScreen extends GetView<HomeController> {
                     }
                     
                     final deal = controller.visibleDeals[index - 1];
-                    return DealCard(deal: deal);
+                    return ImpressionTracker(
+                      dealId: deal.id,
+                      source: 'home_feed',
+                      position: index - 1, // 0-based position in list
+                      child: DealCard(deal: deal),
+                    );
                   },
                 ),
               );
