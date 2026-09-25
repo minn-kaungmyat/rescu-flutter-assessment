@@ -174,16 +174,21 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
           color: Colors.white,
           child: SizedBox(
             width: double.infinity,
-            child: Obx(() {
-              final isExpired = deal.isFlashSale &&
-                  !deal.flashSaleEndsAt!
-                      .isAfter(Get.find<TickService>().now.value);
-              return FilledButton.icon(
-                onPressed: isExpired ? null : controller.addToCart,
-                icon: const Icon(Icons.add_shopping_cart),
-                label: const Text('Add to bag'),
-              );
-            }),
+            child: deal.isFlashSale
+                ? Obx(() {
+                    final isExpired = !deal.flashSaleEndsAt!
+                        .isAfter(Get.find<TickService>().now.value);
+                    return FilledButton.icon(
+                      onPressed: isExpired ? null : controller.addToCart,
+                      icon: const Icon(Icons.add_shopping_cart),
+                      label: const Text('Add to bag'),
+                    );
+                  })
+                : FilledButton.icon(
+                    onPressed: controller.addToCart,
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: const Text('Add to bag'),
+                  ),
           ),
         ),
       );
