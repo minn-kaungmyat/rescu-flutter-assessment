@@ -62,7 +62,7 @@ class HomeController extends GetxController {
     final res = await dealRepo.fetchDeals(page: 1);
     _totalPages = res.totalPages;
     deals.assignAll(res.items);
-    refreshController.refreshCompleted();
+    refreshController.refreshCompleted(resetFooterState: true);
   }
 
   Future<void> loadMore() async {
