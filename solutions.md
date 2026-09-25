@@ -146,6 +146,19 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 
 ---
 
+## F-3 Stock reservations with optimistic UI
+
+**Implementation:** Added server-side state tracking (`ReservationStatus` enum) into the `CartItemModel`. When a user adds an item, `CartService` instantly increments the UI (optimistic update) and calls the API in the background. To enforce the 5-minute lifecycle, reused the global `TickService` from F-1 to monitor all reservations every second. If an item expires, it is flagged as `expired` locally. The checkout process strictly validates this enum, blocking the transaction if any items are invalid. I abstracted the UI changes into a clean `CartItemCard` widget with private sub-widgets to maintain readability.
+
+- _Alternative considered and rejected:_ For the "Mystery Requirement" (what to do when an item expires), I considered having the app automatically delete the expired item from the cart to save space. I rejected this because modifying a user's cart without their explicit consent while they are browsing or typing credit card details is terrible UX. Instead, we choose keep the item in the cart, ghost it (lower opacity), show a red "Expired" tag, and provide explicit "Re-reserve" and "Remove" buttons so the user has total control.
+
+**Edge cases:**
+
+1. **Quantity Reduction Rollback:** Because the API has no `adjustReservation` endpoint, reducing a quantity from 2 to 1 requires requesting a new reservation. If this fails due to stock contention (409 error), we must _not_ delete the item from the cart, because the user still holds the original reservation for 2! So we made a rollback logic to catch this and revert the UI quantity back to the previous valid state.
+2. **Race Conditions:** If a user taps "Add" and then instantly taps "Delete" while the background API call is still flying, the API will eventually succeed and hold stock forever. So added a guard that checks if the item is still in the local cart after the `await` finishes; if it was deleted, it instantly fires a `releaseReservation` call to free the server stock.
+
+---
+
 ## AI Usage Log
 
 **Tool used:** Antigravity IDE (Claude) for codebase analysis and understanding, root-cause identification, code fixes, and documentation.
