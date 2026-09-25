@@ -58,6 +58,8 @@
 
 3. **Large images in memory:** `TheNetworkImage` used `CachedNetworkImage` without `memCacheHeight` or `memCacheWidth`. The deal images are displayed at a fixed size, but the source images can be much larger, so the in-memory image cache could use more memory than necessary.
 
+4. **Ghost Obx Listeners & Layout Jitter:** The `FlashCountdownText` widget used GetX's `Obx` to listen to a 1-second timer. Due to a known issue with `Obx` inside rapidly scrolling `ListView`s, the listeners failed to detach when the cards were destroyed off-screen. This left hundreds of "ghost" widgets firing every second in the background. Furthermore, when the text digits changed, their slight width differences caused the entire parent `Card` to relayout and repaint.
+
 **Why this fix is the right one:**
 
 1. **Targeted `Obx`:** Removed the top-level `Obx` and moved the `scrollOffset` observers to the AppBar and FAB. This prevents scroll updates from rebuilding the feed.
@@ -66,15 +68,17 @@
 
 3. **Image cache size:** Added `memCacheHeight` based on the displayed image height and device pixel ratio. This reduces the size of decoded images kept in the memory cache when the source image is much larger than the displayed image.
 
+4. **Native Ticker & Paint Isolation:** Completely removed `Obx` from the ticking widgets and replaced it with Flutter's native `ValueListenableBuilder` connected to a custom `CentralTicker`, totally eliminating the memory leak. To stop layout jitter, the countdown text was wrapped in a `RepaintBoundary` and styled with `FontFeature.tabularFigures()`, ensuring Flutter only repaints a tiny isolated 20-pixel box instead of the entire Card layer.
+
 **DevTools Evidence:**
 
 _Note: The screenshots for the evidence below are located in the `assets/` folder. The performance screenshots are captured while scrolling through the deals rapidly up and down._
 
 **Before the fixes:**
 
-- **UI jank:** The UI thread reached 118.0 ms for a frame, well above the ~16 ms target for 60 FPS. `DealCard` was rebuilt over 1,500 times during the test.
+- **UI jank:** The UI thread reached ~28 ms per frame while completely idle, well above the 16 ms target for 60 FPS. DevTools recorded exactly 335 `Obx` and `Text` ghost rebuilds firing every single second due to the leaked listeners (see before-fix rebuild stats screenshot).
 
-- **Memory:** The Dart heap reached 114.2 MB. The memory profiler showed 305 `DealCard` instances during the test.
+- **Memory:** The Dart heap reached 93.2 MB during our tests. The memory profiler showed 136 `DealModel` and `PickupWindowModel` instances loaded into memory, alongside heavy `CacheObject` allocations due to the large unscaled network images.
 
 ![Before Performance 1](assets/before_perf_1.png)
 
@@ -84,7 +88,7 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 
 **After the fixes:**
 
-- **UI performance:** UI thread time dropped from 118.0 ms to 4.8 ms during the comparable scrolling test, and the repeated feed rebuilds were no longer observed.
+- **UI performance:** The timeline is perfectly smooth and completely blue. While idle, UI thread time dropped well below 16ms, with `ValueListenableBuilder` rebuilding exactly the 2 widgets that are physically visible on screen. `Raster` times stayed under 8ms (see after-fix screenshots).
 
 - **Raster performance:** Raster time was around 3.0 ms during steady scrolling.
 
@@ -163,35 +167,42 @@ _Note: The screenshots for the evidence below are located in the `assets/` folde
 
 **Tool used:** Antigravity IDE (Claude) for codebase analysis and understanding, root-cause identification, code fixes, and documentation.
 
-**How I used it:** I had the AI analyze the entire codebase first to map out the architecture roughly, skim through the code and identify root causes for all bugs before writing any code. For each fix, I reviewed every line the AI generated and tested it myself. I commented out parts of the fix (eg. generation counter for search) to verify it was actually necessary by reproducing the bug without it.
+**How I used it:** I used the AI as a pair-programming partner. I had it analyze the codebase to map out the architecture and identify potential root causes for the bugs first. I discussed architectural approaches (like how to handle timers globally instead of locally) and pushed back when it suggested poor UX decisions or unidiomatic code (like raw streams instead of GetX). For every fix, I reviewed the code line-by-line, tested it manually in the UI, and deliberately commented out parts of the fixes to prove to myself exactly why they were necessary.
 
 **Example 1 wrong/misleading AI suggestion:**
-_(To be filled with a real example as we work through more bugs)_
+For the F-1 flash sale expiration, the AI suggested using `StreamBuilder` and `.distinct()` to prevent the deal card from rebuilding every second. This was misleading because it introduced raw Dart streams into a codebase that exclusively uses GetX for state management. I rejected this approach and built a clean `StatefulWidget` wrapper that uses a standard GetX `ever` listener instead.
 
 **Example 2 wrong/misleading AI suggestion:**
-_(To be filled with a real example as we work through more bugs)_
+For F-1, the AI suggested wrapping the "Add to bag" button in an `Obx` with a short-circuit condition: `deal.isFlashSale && !deal.flashSaleEndsAt!.isAfter(tick.now.value)`. This caused a crash when viewing regular (non-flash) deals. Because `deal.isFlashSale` was false, Dart short-circuited and never read the observable `now.value`, violating GetX's rule that every `Obx` must read an observable. I fixed this by only applying the `Obx` wrapper if the deal is actually a flash sale.
+
+**Example 3 wrong/misleading AI suggestion:**
+For the F-3 quantity decrement, the AI's rollback logic blindly deleted the entire item from the cart if the API request for the lower quantity failed. By testing the minus button manually, I noticed my entire valid reservation disappeared just because a quantity adjustment failed. I corrected the logic to gracefully revert the UI quantity back to its previous valid state if the user already held a confirmed reservation.
 
 ---
 
 ## Design Questions
 
-**Q1:** _(To be answered)_
+**Q1: In this codebase, what is the difference between a `GetxController`'s lifecycle and a widget `State`'s lifecycle? Name one bug from Part A that exists because of confusion between the two.**
+A widget `State` lives in the UI tree and dies (`dispose`) when it scrolls off-screen or the route changes. A `GetxController` lives in memory until its route is popped (`onClose`), while global services (`Get.put`) live forever. RES-103 happened because a temporary UI controller (`DealDetailsController`) added a permanent listener to the eternal `CartService`, but forgot to remove it when the screen closed.
 
-**Q2:** _(To be answered)_
+**Q2: When does wrapping a large subtree in a single `Obx` hurt you? How do you decide how tightly to scope reactivity?**
+Wrapping a huge subtree (like a `Scaffold`) in a single `Obx` hurts performance because a single variable change forces Flutter to redraw everything inside it, causing lag (as seen in RES-105). To fix this, we follow the "leaf node rule": push `Obx` as deep down the widget tree as possible so it only wraps the exact `Text` or `Icon` that actually changes (e.g., `FlashCountdownText`).
 
-**Q3:** _(To be answered)_
+**Q3: How would you write an automated test that would have caught RES-106 before release? What (if anything) would you change in the code to make such a test possible?**
+To catch RES-106, we need a unit test that passes a known UTC string (`"2026-10-01T23:00:00Z"`) to `PickupWindowModel.fromJson()` and asserts that the local time shifts correctly. To make this test reliable, I would stop using the global `DateTime.now()` and `.toLocal()`. Instead, we can pass a mockable `TimeProvider` interface into the parser so the test suite can explicitly fake the user's "local" timezone.
 
 ---
 
 ## Time Spent
 
-| Phase               | Time  |
-| ------------------- | ----- |
-| Setup & environment | ~1 hr |
-| Codebase analysis   | ~2 hr |
-| Bug fixes           |       |
-| Features            |       |
-| Documentation       |       |
-| **Total**           |       |
+| Phase               | Time    |
+| ------------------- | ------- |
+| Setup & environment | ~1 hr   |
+| Codebase analysis   | ~2 hr   |
+| Bug fixes           | ~3 hr   |
+| Features            | ~4.5 hr |
+| Documentation       | ~1.5 hr |
+| **Total**           | ~12 hr  |
 
-**What I'd do with one more day:** _(To be filled at the end)_
+**What I'd do with one more day:**
+I would write unit tests for the `CartService` state machine to ensure the pending, reserved, and expired transitions behave correctly under mocked time. I'd also like to add a network monitor to handle offline states more gracefully (like pausing the background `TickService`), and finally, add some simple Hero animations between the home feed and the deal details screen to make the app feel a bit more polished.
