@@ -23,7 +23,7 @@ class FlashCountdownText extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: ValueListenableBuilder<DateTime>(
-        valueListenable: CentralTicker.instance.nowNotifier,
+        valueListenable: CentralTicker.instance,
         builder: (context, now, child) {
           final remaining = endsAt.difference(now);
           if (remaining <= Duration.zero) {

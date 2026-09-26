@@ -32,7 +32,7 @@ class _FlashSaleWrapperState extends State<FlashSaleWrapper> {
   }
 
   void _checkExpired() {
-    final now = CentralTicker.instance.nowNotifier.value;
+    final now = CentralTicker.instance.value;
     if (!_isExpired && !widget.endsAt.isAfter(now)) {
       _isExpired = true;
       CentralTicker.instance.removeListener(_checkExpired);

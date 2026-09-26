@@ -1,31 +1,29 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-class CentralTicker {
+class CentralTicker extends ValueNotifier<DateTime> {
   static final CentralTicker instance = CentralTicker._();
-  CentralTicker._();
+  
+  CentralTicker._() : super(DateTime.now());
 
-  final ValueNotifier<DateTime> nowNotifier = ValueNotifier(DateTime.now());
   Timer? _timer;
-  int _listenerCount = 0;
 
+  @override
   void addListener(VoidCallback listener) {
-    if (_listenerCount == 0) {
+    if (!hasListeners) {
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        nowNotifier.value = DateTime.now();
+        value = DateTime.now();
       });
     }
-    _listenerCount++;
-    nowNotifier.addListener(listener);
+    super.addListener(listener);
   }
 
+  @override
   void removeListener(VoidCallback listener) {
-    nowNotifier.removeListener(listener);
-    _listenerCount--;
-    if (_listenerCount <= 0) {
+    super.removeListener(listener);
+    if (!hasListeners) {
       _timer?.cancel();
       _timer = null;
-      _listenerCount = 0;
     }
   }
 }

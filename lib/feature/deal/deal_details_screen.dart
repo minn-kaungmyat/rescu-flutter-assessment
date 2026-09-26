@@ -216,7 +216,7 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
             width: double.infinity,
             child: deal.isFlashSale
                 ? ValueListenableBuilder<DateTime>(
-                    valueListenable: CentralTicker.instance.nowNotifier,
+                    valueListenable: CentralTicker.instance,
                     builder: (context, now, child) {
                       final isExpired =
                           !deal.flashSaleEndsAt!.isAfter(now);

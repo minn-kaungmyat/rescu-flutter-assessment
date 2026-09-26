@@ -178,6 +178,9 @@ For F-1, the AI suggested wrapping the "Add to bag" button in an `Obx` with a sh
 **Example 3 wrong/misleading AI suggestion:**
 For the F-3 quantity decrement, the AI's rollback logic blindly deleted the entire item from the cart if the API request for the lower quantity failed. By testing the minus button manually, I noticed my entire valid reservation disappeared just because a quantity adjustment failed. I corrected the logic to gracefully revert the UI quantity back to its previous valid state if the user already held a confirmed reservation.
 
+**Example 4 wrong/misleading AI suggestion:**
+When building the custom `CentralTicker` for F-1, the AI suggested managing the global timer by manually counting active listeners with an integer (`_listenerCount`). This was a deeply flawed architecture: when a flash deal expired, the wrapper decremented the count, and when that same expired deal scrolled off screen, `dispose()` decremented it *again*. This double-decrement instantly drove the count to 0 and killed the global timer, freezing every live countdown on the screen. I discarded the manual counter entirely and rewrote `CentralTicker` to natively `extend ValueNotifier`, relying on Flutter's built-in `hasListeners` getter to manage the timer safely.
+
 ---
 
 ## Design Questions
